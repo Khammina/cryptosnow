@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CryptoSnow — Daytrading Tracker</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.9.0/dist/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root{
+  --bg:#f5f5f3;--surface:#ffffff;--surface2:#f0efea;
+  --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.18);
+  --text:#1a1a1a;--text2:#6b6b6b;--text3:#999;
+  --blue:#185FA5;--blue-bg:#e6f1fb3b;--blue-text:#0C447C;
+  --green:#1D9E75;--green-bg:#EAF3DE;--green-text:#27500A;
+  --red:#E24B4A;--red-bg:#FCEBEB;--red-text:#791F1F;
+  --amber:#BA7517;--amber-bg:#FAEEDA;--amber-text:#412402;
+  --radius:8px;--radius-lg:12px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --bg:#1a1a18;--surface:#242422;--surface2:#2e2e2c;
+    --border:rgba(255,255,255,0.1);--border2:rgba(255,255,255,0.2);
+    --text:#f0f0ee;--text2:#a0a09e;--text3:#666;
+    --blue:#378ADD;--blue-bg:#0c2a4a;--blue-text:#85B7EB;
+    --green:#1D9E75;--green-bg:#0a2a1e;--green-text:#9FE1CB;
+    --red:#E24B4A;--red-bg:#2a0f0f;--red-text:#F09595;
+    --amber:#EF9F27;--amber-bg:#2a1c05;--amber-text:#FAC775;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+#app{max-width:900px;margin:0 auto}
+
+/* ── Loading ── */
+#loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:16px;color:var(--text2)}
+.spinner{width:32px;height:32px;border:2.5px solid var(--border2);border-top-color:var(--blue);border-radius:50%;animation:spin 0.7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Auth ── */
+.auth-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1.5rem}
+.auth-card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:2rem;width:100%;max-width:360px}
+.auth-logo{font-size:20px;font-weight:600;margin-bottom:4px}
+.auth-sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem}
+.auth-tabs{display:flex;gap:6px;margin-bottom:1.5rem}
+.auth-tab{flex:1;padding:8px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s}
+.auth-tab.active{background:var(--blue-bg);color:var(--blue-text);border-color:var(--blue)}
+.field{margin-bottom:1rem}
+.field label{display:block;font-size:12px;color:var(--text2);margin-bottom:4px}
+.field input{width:100%;padding:9px 12px;font-size:14px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface2);color:var(--text);outline:none;transition:border-color 0.15s}
+.field input:focus{border-color:var(--blue)}
+.btn-primary{width:100%;padding:10px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:500;cursor:pointer;transition:opacity 0.15s}
+.btn-primary:hover{opacity:0.88}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed}
+.auth-err{font-size:12px;color:var(--red);margin-top:8px;text-align:center;min-height:16px}
+
+/* ── Shell ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--surface);border-bottom:0.5px solid var(--border);position:sticky;top:0;z-index:10}
+.logo-text{font-size:15px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.user-chip{font-size:12px;color:var(--text2);background:var(--surface2);padding:4px 10px;border-radius:20px;border:0.5px solid var(--border)}
+.btn-sm{font-size:12px;color:var(--text2);background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);padding:4px 10px;cursor:pointer}
+.nav{display:flex;gap:2px;padding:8px 12px;background:var(--surface);border-bottom:0.5px solid var(--border);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{padding:6px 12px;font-size:13px;border:none;border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all 0.15s}
+.nav-btn.active{background:var(--surface2);color:var(--text);font-weight:500}
+.content{padding:14px}
+
+/* ── Cards & Metrics ── */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:12px}
+.section-title{font-size:14px;font-weight:600;margin-bottom:12px}
+.metric-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px}
+.metric{background:var(--surface2);border-radius:var(--radius);padding:10px 12px}
+.metric-label{font-size:11px;color:var(--text2);margin-bottom:3px}
+.metric-val{font-size:17px;font-weight:600}
+.green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--blue)}.amber{color:var(--amber)}
+
+/* ── Forms ── */
+.form-row{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;margin-bottom:12px}
+.f{display:flex;flex-direction:column;gap:3px}
+.f label{font-size:11px;color:var(--text2)}
+.f input,.f textarea,.f select{padding:7px 9px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface2);color:var(--text);outline:none;width:120px}
+.f input[type=date]{width:145px}
+.f textarea{width:180px;height:34px;resize:none}
+.btn-add{padding:7px 14px;font-size:13px;background:var(--blue);color:#fff;border:none;border-radius:var(--radius);cursor:pointer;white-space:nowrap}
+.btn-add:disabled{opacity:0.5;cursor:not-allowed}
+.btn-del{background:transparent;border:none;color:var(--text3);cursor:pointer;font-size:17px;padding:2px 6px;line-height:1}
+.btn-del:hover{color:var(--red)}
+
+/* ── Tables ── */
+.tbl-wrap{overflow-x:auto}
+.jtable{width:100%;border-collapse:collapse;font-size:13px;min-width:400px}
+.jtable th{text-align:left;padding:7px 10px;font-size:11px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border)}
+.jtable td{padding:7px 10px;border-bottom:0.5px solid var(--border);color:var(--text)}
+.jtable tr:last-child td{border-bottom:none}
+.jtable tr:hover td{background:var(--surface2)}
+.tag{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:500}
+.tag-p{background:var(--green-bg);color:var(--green-text)}
+.tag-l{background:var(--red-bg);color:var(--red-text)}
+
+/* ── Calendar ── */
+.cal-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.cal-nav-group{display:flex;align-items:center;gap:6px}
+.cal-nav-btn{background:transparent;border:0.5px solid var(--border2);border-radius:var(--radius);padding:4px 10px;cursor:pointer;color:var(--text);font-size:13px}
+.cal-year-label{font-size:16px;font-weight:600;min-width:50px;text-align:center}
+.year-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.mini-month{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:10px;cursor:pointer;transition:border-color 0.15s}
+.mini-month:hover{border-color:var(--blue)}
+.mini-month-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+.mini-month-name{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.06em}
+.mini-month-pnl{font-size:11px;font-weight:600}
+.mini-day-headers{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-bottom:2px}
+.mini-dh{font-size:9px;color:var(--text3);text-align:center}
+.mini-days{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.mini-d{font-size:9px;text-align:center;padding:2px 1px;border-radius:3px;min-height:15px;line-height:1.1}
+.mini-d.p{background:var(--green-bg);color:var(--green-text)}
+.mini-d.l{background:var(--red-bg);color:var(--red-text)}
+
+/* Month zoom */
+.month-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.month-title{font-size:17px;font-weight:600}
+.month-back{display:flex;align-items:center;gap:5px;font-size:13px;padding:6px 12px;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer}
+.month-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:8px;margin-bottom:14px}
+.mstat{background:var(--surface2);border-radius:var(--radius);padding:8px 10px}
+.mstat-label{font-size:10px;color:var(--text2);margin-bottom:2px}
+.mstat-val{font-size:15px;font-weight:600}
+.big-dh-row{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px}
+.big-dh{font-size:11px;color:var(--text2);text-align:center;padding:4px 2px}
+.big-cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
+.bcd{min-height:60px;border-radius:var(--radius);border:0.5px solid var(--border);padding:5px 6px;display:flex;flex-direction:column;gap:2px;background:var(--surface)}
+.bcd.p{border-color:#9FE1CB;background:var(--green-bg)}
+.bcd.l{border-color:#F7C1C1;background:var(--red-bg)}
+.bcd.empty{background:var(--surface2);border-color:transparent}
+.bcd.today{border-width:2px;border-color:var(--blue)}
+.bcd-num{font-size:10px;font-weight:600;color:var(--text2)}
+.bcd-num.p{color:var(--green-text)}.bcd-num.l{color:var(--red-text)}
+.bcd-pnl{font-size:11px;font-weight:600}
+.bcd-pnl.p{color:var(--green)}.bcd-pnl.l{color:var(--red)}
+.bcd-cnt{font-size:9px;color:var(--text3)}
+.cal-legend{display:flex;gap:14px;margin-top:10px;flex-wrap:wrap}
+.cal-legend span{font-size:11px;color:var(--text2);display:flex;align-items:center;gap:5px}
+.ldot{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+/* ── Snowball ── */
+.settings-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}
+.settings-row label{font-size:12px;color:var(--text2)}
+.settings-row input[type=range]{width:100px}
+.badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:20px}
+.badge-blue{background:var(--blue-bg);color:var(--blue-text)}
+.badge-green{background:var(--green-bg);color:var(--green-text)}
+.chart-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.chart-tab{padding:5px 12px;font-size:12px;border:0.5px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);cursor:pointer;transition:all 0.15s}
+.chart-tab.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.legend-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text2)}
+.sb-scroll{overflow-x:auto;max-height:300px;overflow-y:auto}
+.sb-table{border-collapse:collapse;font-size:12px;width:100%;min-width:420px}
+.sb-table th{padding:7px 10px;font-size:11px;color:var(--text2);border-bottom:0.5px solid var(--border);white-space:nowrap;position:sticky;top:0;background:var(--surface);font-weight:500}
+.sb-table td{padding:5px 10px;border-bottom:0.5px solid var(--border);color:var(--text);white-space:nowrap}
+.sb-table tr:last-child td{border-bottom:none}
+.sb-table tr:hover td{background:var(--surface2)}
+
+/* ── Saving indicator ── */
+.save-indicator{position:fixed;bottom:20px;right:20px;background:var(--surface);border:0.5px solid var(--border);border-radius:var(--radius);padding:8px 14px;font-size:13px;color:var(--text2);display:none;align-items:center;gap:8px;box-shadow:0 2px 12px rgba(0,0,0,0.1);z-index:100}
+.save-indicator.show{display:flex}
+.save-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1s ease infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="loading"><div class="spinner"></div><span>Loading...</span></div>
+</div>
+<div class="save-indicator" id="save-ind"><span class="save-dot"></span> Saving...</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  CONFIG — Paste your deployed Google Apps Script URL here
+// ══════════════════════════════════════════════════════════════
+const API_URL = "https://script.google.com/macros/s/AKfycbwrD8JD_V-gumCQ0KusmAigJzZPwEHYg0dee9bwrWtdfVlCYAjb3cPr3wsK24m4STdm/exec"; //"YOUR_GOOGLE_APPS_SCRIPT_URL_HERE"
+
+// ══════════════════════════════════════════════════════════════
+//  API helper
+// ══════════════════════════════════════════════════════════════
+async function api(action, payload = {}) {
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: JSON.stringify({ action, ...payload })
+  });
+  return res.json();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════════════
+let currentUser = null;
+let activeTab = "home";
+let calView = "year";
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth();
+let sbChartMode = "balance";
+let chartInst = null;
+let sbChartInst = null;
+let deposits = [];
+let pnls = [];
+let settings = { startAmount: 80, dailyRate: 2 };
+let sbDays = 60;
+
+const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const MONTH_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_H_SHORT = ["Su","Mo","Tu","We","Th","Fr","Sa"];
+const DAY_H_FULL  = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function todayStr(){const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`}
+
+// ══════════════════════════════════════════════════════════════
+//  Save indicator
+// ══════════════════════════════════════════════════════════════
+let saveTimer = null;
+function showSaving(){
+  const el = document.getElementById("save-ind");
+  el.classList.add("show");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>el.classList.remove("show"), 1800);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Bootstrap
+// ══════════════════════════════════════════════════════════════
+window.addEventListener("DOMContentLoaded", () => {
+  const saved = sessionStorage.getItem("csUser");
+  if (saved) {
+    currentUser = saved;
+    loadUserData().then(() => renderShell());
+  } else {
+    renderAuth();
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  Load all user data from API
+// ══════════════════════════════════════════════════════════════
+async function loadUserData() {
+  const [d, p, s] = await Promise.all([
+    api("getDeposits", { username: currentUser }),
+    api("getPNLs",     { username: currentUser }),
+    api("getSettings", { username: currentUser }),
+  ]);
+  deposits = d.data || [];
+  pnls     = p.data || [];
+  if (s.data && s.data.startAmount) settings = s.data;
+  else settings = { startAmount: 80, dailyRate: 2 };
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Auth
+// ══════════════════════════════════════════════════════════════
+function renderAuth(mode = "login") {
+  document.getElementById("app").innerHTML = `
+  <div class="auth-wrap"><div class="auth-card">
+    <div class="auth-logo"><i class="ti ti-chart-candle"></i> CryptoSnow</div>
+    <div class="auth-sub">Snowball daytrading tracker</div>
+    <div class="auth-tabs">
+      <button class="auth-tab ${mode==='login'?'active':''}" onclick="renderAuth('login')">Sign in</button>
+      <button class="auth-tab ${mode==='reg'?'active':''}" onclick="renderAuth('reg')">Register</button>
+    </div>
+    ${mode === "login" ? `
+      <div class="field"><label>Username</label><input id="au" placeholder="username" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <div class="field"><label>Password</label><input id="ap" type="password" placeholder="password" onkeydown="if(event.key==='Enter')doLogin()"/></div>
+      <button class="btn-primary" id="auth-btn" onclick="doLogin()">Sign in</button>
+    ` : `
+      <div class="field"><label>Username</label><input id="au" placeholder="choose a username" onkeydown="if(event.key==='Enter')doRegister()"/></div>
+      <div class="field"><label>Password</label><input id="ap" type="password" placeholder="choose a password" onkeydown="if(event.key==='Enter')doRegister()"/></div>
+      <button class="btn-primary" id="auth-btn" onclick="doRegister()">Create account</button>
+    `}
+    <div class="auth-err" id="aerr"></div>
+  </div></div>`;
+}
+
+async function doLogin() {
+  const u = document.getElementById("au").value.trim();
+  const p = document.getElementById("ap").value;
+  if (!u || !p) { document.getElementById("aerr").textContent = "Please fill in all fields."; return; }
+  const btn = document.getElementById("auth-btn");
+  btn.disabled = true; btn.textContent = "Signing in...";
+  const res = await api("login", { username: u, password: p });
+  if (!res.ok) { document.getElementById("aerr").textContent = res.error; btn.disabled = false; btn.textContent = "Sign in"; return; }
+  currentUser = u;
+  sessionStorage.setItem("csUser", u);
+  await loadUserData();
+  renderShell();
+}
+
+async function doRegister() {
+  const u = document.getElementById("au").value.trim();
+  const p = document.getElementById("ap").value;
+  if (!u || !p) { document.getElementById("aerr").textContent = "Please fill in all fields."; return; }
+  if (p.length < 6) { document.getElementById("aerr").textContent = "Password must be at least 6 characters."; return; }
+  const btn = document.getElementById("auth-btn");
+  btn.disabled = true; btn.textContent = "Creating account...";
+  const res = await api("register", { username: u, password: p });
+  if (!res.ok) { document.getElementById("aerr").textContent = res.error; btn.disabled = false; btn.textContent = "Create account"; return; }
+  currentUser = u;
+  sessionStorage.setItem("csUser", u);
+  deposits = []; pnls = []; settings = { startAmount: 80, dailyRate: 2 };
+  renderShell();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Shell
+// ══════════════════════════════════════════════════════════════
+function renderShell() {
+  const tabs = ["home","deposits","journal","chart","snowball"];
+  const icons = { home:"ti-home", deposits:"ti-database", journal:"ti-notes", chart:"ti-chart-line", snowball:"ti-snowflake" };
+  const labels = { home:"Home", deposits:"Deposits", journal:"Journal", chart:"Chart", snowball:"Snowball" };
+  document.getElementById("app").innerHTML = `
+  <div class="topbar">
+    <span class="logo-text"><i class="ti ti-chart-candle"></i> CryptoSnow</span>
+    <div class="topbar-right">
+      <span class="user-chip"><i class="ti ti-user"></i> ${currentUser}</span>
+      <button class="btn-sm" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+  <div class="nav">${tabs.map(t=>`<button class="nav-btn${t===activeTab?' active':''}" onclick="setTab('${t}')"><i class="ti ${icons[t]}"></i> ${labels[t]}</button>`).join('')}</div>
+  <div class="content" id="tab-content"></div>`;
+  renderTab();
+}
+
+function doLogout() {
+  currentUser = null;
+  sessionStorage.removeItem("csUser");
+  deposits = []; pnls = []; settings = { startAmount: 80, dailyRate: 2 };
+  renderAuth();
+}
+
+function setTab(t) {
+  activeTab = t;
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  if (sbChartInst) { sbChartInst.destroy(); sbChartInst = null; }
+  document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll(".nav-btn")[["home","deposits","journal","chart","snowball"].indexOf(t)]?.classList.add("active");
+  renderTab();
+}
+
+function renderTab() {
+  const el = document.getElementById("tab-content");
+  if (!el) return;
+  if      (activeTab === "home")     renderHome(el);
+  else if (activeTab === "deposits") renderDeposits(el);
+  else if (activeTab === "journal")  renderJournal(el);
+  else if (activeTab === "chart")    renderInvChart(el);
+  else if (activeTab === "snowball") renderSnowball(el);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  Helpers
+// ══════════════════════════════════════════════════════════════
+function totalDeposited() { return deposits.reduce((s,d)=>s+Number(d.amount),0); }
+function totalPNL()       { return pnls.reduce((s,p)=>s+Number(p.pnl),0); }
+
+function buildPNLMap() {
+  const map = {};
+  pnls.forEach(p => {
+    if (!p.date) return;
+    if (!map[p.date]) map[p.date] = { pnl: 0, count: 0 };
+    map[p.date].pnl   += Number(p.pnl);
+    map[p.date].count++;
+  });
+  return map;
+}
+
+function fmtPNL(v) { return (v >= 0 ? "+" : "") + "$" + Math.abs(v).toFixed(2); }
+
+// ══════════════════════════════════════════════════════════════
+//  HOME — Calendar
+// ══════════════════════════════════════════════════════════════
+function renderHome(el) {
+  const td = totalDeposited(), tp = totalPNL(), cb = td + tp;
+  el.innerHTML = `
+  <div class="metric-row">
+    <div class="metric"><div class="metric-label">Total deposited</div><div class="metric-val">$${td.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Total PNL</div><div class="metric-val ${tp>=0?'green':'red'}">${fmtPNL(tp)}</div></div>
+    <div class="metric"><div class="metric-label">Balance</div><div class="metric-val blue">$${cb.toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Daily rate</div><div class="metric-val amber">${settings.dailyRate}%</div></div>
+  </div>
+  <div class="card" id="cal-card"></div>`;
+  renderCalCard();
+}
+
+function renderCalCard() {
+  const card = document.getElementById("cal-card");
+  if (!card) return;
+  if (calView === "year") renderYearView(card);
+  else renderMonthView(card);
+}
+
+function renderYearView(card) {
+  const pnlMap = buildPNLMap();
+  let yearPNL = 0;
+  for (let m = 0; m < 12; m++) {
+    const dim = new Date(calYear, m+1, 0).getDate();
+    for (let d = 1; d <= dim; d++) {
+      const ds = `${calYear}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if (pnlMap[ds]) yearPNL += pnlMap[ds].pnl;
+    }
+  }
+  card.innerHTML = `
+  <div class="cal-header">
+    <div class="cal-nav-group">
+      <button class="cal-nav-btn" onclick="calYearStep(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span class="cal-year-label">${calYear}</span>
+      <button class="cal-nav-btn" onclick="calYearStep(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <span style="font-size:14px;font-weight:600;color:${yearPNL>=0?'var(--green)':'var(--red)'}">${fmtPNL(yearPNL)} <span style="font-size:12px;font-weight:400;color:var(--text2)">year PNL</span></span>
+  </div>
+  <div class="year-grid" id="year-grid"></div>
+  <div class="cal-legend">
+    <span><span class="ldot" style="background:var(--green-bg);border:0.5px solid #9FE1CB"></span>Profit day</span>
+    <span><span class="ldot" style="background:var(--red-bg);border:0.5px solid #F7C1C1"></span>Loss day</span>
+    <span><i class="ti ti-zoom-in" style="font-size:12px"></i> Click a month to zoom in</span>
+  </div>`;
+
+  const grid = document.getElementById("year-grid");
+  let html = "";
+  for (let m = 0; m < 12; m++) {
+    const dim = new Date(calYear, m+1, 0).getDate();
+    const firstDay = new Date(calYear, m, 1).getDay();
+    let mPNL = 0;
+    for (let d = 1; d <= dim; d++) {
+      const ds = `${calYear}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if (pnlMap[ds]) mPNL += pnlMap[ds].pnl;
+    }
+    const pnlStr = mPNL !== 0 ? `<span class="mini-month-pnl" style="color:${mPNL>=0?'var(--green)':'var(--red)'}">${fmtPNL(mPNL)}</span>` : '';
+    html += `<div class="mini-month" onclick="zoomMonth(${m})" role="button" aria-label="Zoom ${MONTH_NAMES[m]}">
+      <div class="mini-month-header"><span class="mini-month-name">${MONTH_SHORT[m]}</span>${pnlStr}</div>
+      <div class="mini-day-headers">${DAY_H_SHORT.map(h=>`<div class="mini-dh">${h}</div>`).join('')}</div>
+      <div class="mini-days">`;
+    for (let i = 0; i < firstDay; i++) html += `<div class="mini-d"></div>`;
+    for (let d = 1; d <= dim; d++) {
+      const ds = `${calYear}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const entry = pnlMap[ds];
+      if (entry) {
+        const cls = entry.pnl >= 0 ? 'p' : 'l';
+        html += `<div class="mini-d ${cls}" title="${ds}: ${fmtPNL(entry.pnl)}">${d}</div>`;
+      } else {
+        html += `<div class="mini-d">${d}</div>`;
+      }
+    }
+    html += `</div></div>`;
+  }
+  grid.innerHTML = html;
+}
+
+function renderMonthView(card) {
+  const pnlMap = buildPNLMap();
+  const dim = new Date(calYear, calMonth+1, 0).getDate();
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const tStr = todayStr();
+  let mPNL = 0, mTrades = 0, mWins = 0, mLoss = 0;
+  for (let d = 1; d <= dim; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (pnlMap[ds]) {
+      mPNL += pnlMap[ds].pnl;
+      mTrades += pnlMap[ds].count;
+      if (pnlMap[ds].pnl >= 0) mWins++; else mLoss++;
+    }
+  }
+  card.innerHTML = `
+  <div class="month-header">
+    <button class="month-back" onclick="backToYear()"><i class="ti ti-arrow-left"></i> ${calYear}</button>
+    <div class="cal-nav-group">
+      <button class="cal-nav-btn" onclick="stepMonth(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span class="month-title">${MONTH_NAMES[calMonth]} ${calYear}</span>
+      <button class="cal-nav-btn" onclick="stepMonth(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+  </div>
+  <div class="month-summary">
+    <div class="mstat"><div class="mstat-label">Month PNL</div><div class="mstat-val ${mPNL>=0?'green':'red'}">${fmtPNL(mPNL)}</div></div>
+    <div class="mstat"><div class="mstat-label">Trade days</div><div class="mstat-val">${mTrades}</div></div>
+    <div class="mstat"><div class="mstat-label">Profit days</div><div class="mstat-val green">${mWins}</div></div>
+    <div class="mstat"><div class="mstat-label">Loss days</div><div class="mstat-val red">${mLoss}</div></div>
+  </div>
+  <div class="big-dh-row">${DAY_H_FULL.map(h=>`<div class="big-dh">${h}</div>`).join('')}</div>
+  <div class="big-cal-grid" id="big-cal"></div>
+  <div class="cal-legend">
+    <span><span class="ldot" style="background:var(--green-bg);border:0.5px solid #9FE1CB"></span>Profit</span>
+    <span><span class="ldot" style="background:var(--red-bg);border:0.5px solid #F7C1C1"></span>Loss</span>
+    <span><span class="ldot" style="border:2px solid var(--blue)"></span>Today</span>
+  </div>`;
+
+  let html = "";
+  for (let i = 0; i < firstDay; i++) html += `<div class="bcd empty"></div>`;
+  for (let d = 1; d <= dim; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const entry = pnlMap[ds];
+    const isToday = ds === tStr;
+    let cls = "bcd";
+    if (entry) cls += entry.pnl >= 0 ? " p" : " l";
+    if (isToday) cls += " today";
+    const numCls = "bcd-num" + (entry ? (entry.pnl>=0?" p":" l") : "");
+    if (entry) {
+      const pCls = "bcd-pnl" + (entry.pnl>=0?" p":" l");
+      html += `<div class="${cls}">
+        <div class="${numCls}">${d}</div>
+        <div class="${pCls}">${fmtPNL(entry.pnl)}</div>
+        <div class="bcd-cnt">${entry.count} trade${entry.count>1?'s':''}</div>
+      </div>`;
+    } else {
+      html += `<div class="${cls}"><div class="${numCls}">${d}</div></div>`;
+    }
+  }
+  document.getElementById("big-cal").innerHTML = html;
+}
+
+window.calYearStep = n => { calYear += n; renderCalCard(); };
+window.zoomMonth   = m => { calMonth = m; calView = "month"; renderCalCard(); };
+window.backToYear  = () => { calView = "year"; renderCalCard(); };
+window.stepMonth   = n => {
+  calMonth += n;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  renderCalCard();
+};
+
+// ══════════════════════════════════════════════════════════════
+//  DEPOSITS
+// ══════════════════════════════════════════════════════════════
+function renderDeposits(el) {
+  el.innerHTML = `
+  <div class="metric-row">
+    <div class="metric"><div class="metric-label">Total deposits</div><div class="metric-val">$${totalDeposited().toFixed(2)}</div></div>
+    <div class="metric"><div class="metric-label">Count</div><div class="metric-val">${deposits.length}</div></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Add deposit</div>
+    <div class="form-row">
+      <div class="f"><label>Amount (USD)</label><input type="number" id="dep-amt" placeholder="80" min="0"/></div>
+      <div class="f"><label>Date</label><input type="date" id="dep-date" value="${todayStr()}"/></div>
+      <div class="f"><label>Note</label><input type="text" id="dep-note" placeholder="optional"/></div>
+      <button class="btn-add" id="dep-btn" onclick="addDeposit()"><i class="ti ti-plus"></i> Add</button>
+    </div>
+    <div class="tbl-wrap"><table class="jtable">
+      <thead><tr><th>#</th><th>Date</th><th>Amount</th><th>Note</th><th></th></tr></thead>
+      <tbody>${deposits.slice().reverse().map((d,i)=>`<tr>
+        <td style="color:var(--text2)">${deposits.length-i}</td>
+        <td>${d.date}</td><td><strong>$${Number(d.amount).toFixed(2)}</strong></td>
+        <td style="color:var(--text2)">${d.note||'—'}</td>
+        <td><button class="btn-del" onclick="delDeposit(${deposits.length-1-i})">×</button></td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+
+async function addDeposit() {
+  const amt  = parseFloat(document.getElementById("dep-amt").value);
+  const date = document.getElementById("dep-date").value;
+  const note = document.getElementById("dep-note").value;
+  if (!amt || !date) { alert("Please enter an amount and date."); return; }
+  const btn = document.getElementById("dep-btn");
+  btn.disabled = true;
+  deposits.push({ amount: amt, date, note });
+  showSaving();
+  await api("saveDeposits", { username: currentUser, deposits });
+  btn.disabled = false;
+  renderTab();
+}
+
+async function delDeposit(i) {
+  if (!confirm("Delete this deposit entry?")) return;
+  deposits.splice(i, 1);
+  showSaving();
+  await api("saveDeposits", { username: currentUser, deposits });
+  renderTab();
+}
+window.addDeposit = addDeposit;
+window.delDeposit = delDeposit;
+
+// ══════════════════════════════════════════════════════════════
+//  JOURNAL
+// ══════════════════════════════════════════════════════════════
+function renderJournal(el) {
+  const tp = totalPNL();
+  el.innerHTML = `
+  <div class="metric-row">
+    <div class="metric"><div class="metric-label">Total PNL</div><div class="metric-val ${tp>=0?'green':'red'}">${fmtPNL(tp)}</div></div>
+    <div class="metric"><div class="metric-label">Trades logged</div><div class="metric-val">${pnls.length}</div></div>
+    <div class="metric"><div class="metric-label">Win entries</div><div class="metric-val green">${pnls.filter(p=>Number(p.pnl)>0).length}</div></div>
+    <div class="metric"><div class="metric-label">Loss entries</div><div class="metric-val red">${pnls.filter(p=>Number(p.pnl)<0).length}</div></div>
+  </div>
+  <div class="card">
+    <div class="section-title">Log trade PNL</div>
+    <div class="form-row">
+      <div class="f"><label>PNL (+ / -)</label><input type="number" id="pnl-amt" placeholder="2.5 or -1.2"/></div>
+      <div class="f"><label>Date</label><input type="date" id="pnl-date" value="${todayStr()}"/></div>
+      <div class="f"><label>Pair</label><input type="text" id="pnl-pair" placeholder="BTC/USDT" style="width:100px"/></div>
+      <div class="f"><label>Comment</label><textarea id="pnl-note" placeholder="Entry reason..."></textarea></div>
+      <button class="btn-add" id="pnl-btn" onclick="addPNL()"><i class="ti ti-plus"></i> Log</button>
+    </div>
+    <div class="tbl-wrap"><table class="jtable">
+      <thead><tr><th>#</th><th>Date</th><th>Pair</th><th>PNL</th><th>Status</th><th>Comment</th><th></th></tr></thead>
+      <tbody>${pnls.slice().reverse().map((p,i)=>{const v=Number(p.pnl);return`<tr>
+        <td style="color:var(--text2)">${pnls.length-i}</td>
+        <td>${p.date}</td><td>${p.pair||'—'}</td>
+        <td style="font-weight:600;color:${v>=0?'var(--green)':'var(--red)'}">${fmtPNL(v)}</td>
+        <td><span class="tag ${v>=0?'tag-p':'tag-l'}">${v>=0?'Profit':'Loss'}</span></td>
+        <td style="color:var(--text2);max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.note||'—'}</td>
+        <td><button class="btn-del" onclick="delPNL(${pnls.length-1-i})">×</button></td>
+      </tr>`}).join('')}</tbody>
+    </table></div>
+  </div>`;
+}
+
+async function addPNL() {
+  const pnl  = parseFloat(document.getElementById("pnl-amt").value);
+  const date = document.getElementById("pnl-date").value;
+  const pair = document.getElementById("pnl-pair").value;
+  const note = document.getElementById("pnl-note").value;
+  if (isNaN(pnl) || !date) { alert("Please enter a PNL value and date."); return; }
+  const btn = document.getElementById("pnl-btn");
+  btn.disabled = true;
+  pnls.push({ pnl, date, pair, note });
+  showSaving();
+  await api("savePNLs", { username: currentUser, pnls });
+  btn.disabled = false;
+  renderTab();
+}
+
+async function delPNL(i) {
+  if (!confirm("Delete this trade entry?")) return;
+  pnls.splice(i, 1);
+  showSaving();
+  await api("savePNLs", { username: currentUser, pnls });
+  renderTab();
+}
+window.addPNL = addPNL;
+window.delPNL = delPNL;
+
+// ══════════════════════════════════════════════════════════════
+//  INVESTMENT CHART
+// ══════════════════════════════════════════════════════════════
+function renderInvChart(el) {
+  el.innerHTML = `
+  <div class="card">
+    <div class="section-title">Investment chart</div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="tog-bal" checked onchange="rebuildInvChart()"><span style="width:10px;height:10px;border-radius:2px;background:#185FA5;display:inline-block"></span>Total balance</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="tog-dep" checked onchange="rebuildInvChart()"><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block"></span>Total invested</label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text2)"><input type="checkbox" id="tog-pnl" checked onchange="rebuildInvChart()"><span style="width:10px;height:10px;border-radius:2px;background:#D85A30;display:inline-block"></span>Total PNL</label>
+    </div>
+    <div style="position:relative;width:100%;height:300px">
+      <canvas id="inv-chart" role="img" aria-label="Investment growth chart">No data yet.</canvas>
+    </div>
+  </div>`;
+  buildInvChart();
+}
+
+window.rebuildInvChart = buildInvChart;
+function buildInvChart() {
+  const canvas = document.getElementById("inv-chart"); if (!canvas) return;
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  const allDates = new Set();
+  deposits.forEach(d => { if (d.date) allDates.add(d.date); });
+  pnls.forEach(p     => { if (p.date) allDates.add(p.date); });
+  const sorted = [...allDates].sort();
+  if (sorted.length === 0) { canvas.textContent = "No data yet."; return; }
+  const depC = {}, pnlC = {}; let rd = 0, rp = 0;
+  sorted.forEach(date => {
+    deposits.filter(d => d.date === date).forEach(d => { rd += Number(d.amount); });
+    pnls.filter(p     => p.date === date).forEach(p => { rp += Number(p.pnl);    });
+    depC[date] = rd; pnlC[date] = rp;
+  });
+  const sb  = document.getElementById("tog-bal")?.checked ?? true;
+  const sd  = document.getElementById("tog-dep")?.checked ?? true;
+  const sp  = document.getElementById("tog-pnl")?.checked ?? true;
+  const datasets = [];
+  if (sb) datasets.push({ label: "Balance", data: sorted.map(d => +(depC[d]+pnlC[d]).toFixed(2)), borderColor:"#185FA5", backgroundColor:"rgba(24,95,165,0.07)", fill:true, tension:0.3, pointRadius:3 });
+  if (sd) datasets.push({ label: "Invested", data: sorted.map(d => +depC[d].toFixed(2)), borderColor:"#1D9E75", backgroundColor:"transparent", fill:false, tension:0.3, pointRadius:3, borderDash:[5,3] });
+  if (sp) datasets.push({ label: "PNL", data: sorted.map(d => +pnlC[d].toFixed(2)), borderColor:"#D85A30", backgroundColor:"transparent", fill:false, tension:0.3, pointRadius:3, borderDash:[2,4] });
+  chartInst = new Chart(canvas, { type:"line", data:{labels:sorted,datasets}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:11},maxTicksLimit:10}},y:{ticks:{callback:v=>'$'+v.toLocaleString()}}}}});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SNOWBALL
+// ══════════════════════════════════════════════════════════════
+function renderSnowball(el) {
+  el.innerHTML = `
+  <div class="card">
+    <div class="section-title">Snowball settings</div>
+    <div class="settings-row">
+      <label>Start ($)</label>
+      <input type="number" id="sb-start" value="${settings.startAmount}" min="1" step="1" style="width:90px;padding:6px 8px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--surface2);color:var(--text)" oninput="updateSB()"/>
+      <label>Daily %</label>
+      <input type="range" id="sb-rate" min="0.5" max="15" step="0.1" value="${settings.dailyRate}" oninput="syncSBRate()"/>
+      <span class="badge badge-blue" id="sb-rate-out">${Number(settings.dailyRate).toFixed(1)}%</span>
+      <label>Days</label>
+      <input type="range" id="sb-days" min="7" max="365" step="1" value="${sbDays}" oninput="syncSBDays()"/>
+      <span class="badge badge-green" id="sb-days-out">${sbDays}d</span>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-title">Growth projection</div>
+    <div class="chart-tabs">
+      <button class="chart-tab active" id="sbt-balance" onclick="setSBChart('balance')"><i class="ti ti-chart-line"></i> Balance</button>
+      <button class="chart-tab" id="sbt-daily"   onclick="setSBChart('daily')"><i class="ti ti-chart-bar"></i> Daily profit ($)</button>
+      <button class="chart-tab" id="sbt-pct"     onclick="setSBChart('pct')"><i class="ti ti-percentage"></i> Return %</button>
+    </div>
+    <div class="legend-row" id="sb-legend"></div>
+    <div style="position:relative;width:100%;height:280px">
+      <canvas id="sb-chart" role="img" aria-label="Snowball projection">Loading...</canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div class="section-title">Day-by-day table</div>
+    <div class="sb-scroll"><table class="sb-table" id="sb-table"></table></div>
+  </div>`;
+  buildSBAll();
+}
+
+window.syncSBRate = () => { const v = parseFloat(document.getElementById("sb-rate").value); document.getElementById("sb-rate-out").textContent = v.toFixed(1)+"%"; updateSB(); };
+window.syncSBDays = () => { const v = parseInt(document.getElementById("sb-days").value); document.getElementById("sb-days-out").textContent = v+"d"; updateSB(); };
+window.updateSB   = async () => {
+  const start = parseFloat(document.getElementById("sb-start").value) || 80;
+  const rate  = parseFloat(document.getElementById("sb-rate").value)  || 2;
+  sbDays      = parseInt(document.getElementById("sb-days").value)    || 60;
+  settings.startAmount = start; settings.dailyRate = rate;
+  showSaving();
+  await api("saveSettings", { username: currentUser, settings });
+  buildSBAll();
+};
+window.setSBChart = mode => {
+  sbChartMode = mode;
+  ["balance","daily","pct"].forEach(m => { const b = document.getElementById("sbt-"+m); if(b) b.className = "chart-tab"+(m===mode?" active":""); });
+  buildSBChart(getSBData());
+};
+
+function getSBData() {
+  const start = parseFloat(document.getElementById("sb-start")?.value) || settings.startAmount || 80;
+  const rate  = parseFloat(document.getElementById("sb-rate")?.value)  || settings.dailyRate  || 2;
+  const days  = parseInt(document.getElementById("sb-days")?.value)    || sbDays              || 60;
+  const labels=[], balances=[], dailyProfits=[], pctReturns=[];
+  let bal = start;
+  for (let d = 1; d <= days; d++) {
+    const profit = bal * (rate/100); bal += profit;
+    labels.push("D"+d); balances.push(+bal.toFixed(2)); dailyProfits.push(+profit.toFixed(2)); pctReturns.push(+(((bal-start)/start)*100).toFixed(2));
+  }
+  return { labels, balances, dailyProfits, pctReturns, start, rate, days };
+}
+
+function buildSBAll() { const data = getSBData(); buildSBChart(data); buildSBTable(data); }
+
+function buildSBChart(data) {
+  const canvas = document.getElementById("sb-chart"); if (!canvas) return;
+  if (sbChartInst) { sbChartInst.destroy(); sbChartInst = null; }
+  const legend = document.getElementById("sb-legend");
+  let dataset, yLabel, color, legendHTML;
+  if (sbChartMode === "balance") {
+    color="#185FA5"; dataset={label:"Balance",data:data.balances,borderColor:color,backgroundColor:"rgba(24,95,165,0.08)",fill:true,tension:0.4,pointRadius:0,pointHoverRadius:4};
+    yLabel=v=>'$'+v.toLocaleString(undefined,{maximumFractionDigits:2}); legendHTML=`<span class="legend-item"><span class="legend-dot" style="background:#185FA5"></span>Account balance ($)</span>`;
+  } else if (sbChartMode === "daily") {
+    color="#1D9E75"; dataset={label:"Daily profit",data:data.dailyProfits,borderColor:color,backgroundColor:"rgba(29,158,117,0.08)",fill:true,tension:0.4,pointRadius:0,pointHoverRadius:4};
+    yLabel=v=>'$'+v.toLocaleString(undefined,{maximumFractionDigits:2}); legendHTML=`<span class="legend-item"><span class="legend-dot" style="background:#1D9E75"></span>Daily profit ($)</span>`;
+  } else {
+    color="#BA7517"; dataset={label:"% return",data:data.pctReturns,borderColor:color,backgroundColor:"rgba(186,117,23,0.08)",fill:true,tension:0.4,pointRadius:0,pointHoverRadius:4};
+    yLabel=v=>v.toFixed(0)+"%"; legendHTML=`<span class="legend-item"><span class="legend-dot" style="background:#BA7517"></span>Total return vs starting capital (%)</span>`;
+  }
+  if (legend) legend.innerHTML = legendHTML;
+  sbChartInst = new Chart(canvas, { type:"line", data:{labels:data.labels,datasets:[dataset]}, options:{ responsive:true, maintainAspectRatio:false, interaction:{mode:"index",intersect:false}, plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>dataset.label+": "+yLabel(ctx.parsed.y)}}}, scales:{x:{ticks:{font:{size:11},maxTicksLimit:12,autoSkip:true},grid:{display:false}},y:{ticks:{font:{size:11},callback:yLabel},grid:{color:"rgba(128,128,128,0.1)"}}}}});
+}
+
+function buildSBTable(data) {
+  const tbl = document.getElementById("sb-table"); if (!tbl) return;
+  let rows = `<thead><tr><th>Day</th><th>Balance</th><th>Daily ($)</th><th>Daily %</th><th>Total profit</th><th>Return %</th><th>Multiplier</th></tr></thead><tbody>`;
+  let bal = data.start;
+  for (let d = 1; d <= data.days; d++) {
+    const profit = bal*(data.rate/100); bal += profit;
+    rows += `<tr>
+      <td style="color:var(--text2);font-weight:600">D${d}</td>
+      <td><strong>$${bal.toFixed(2)}</strong></td>
+      <td style="color:var(--green)">+$${profit.toFixed(2)}</td>
+      <td style="color:var(--green)">+${data.rate.toFixed(1)}%</td>
+      <td style="color:var(--blue)">+$${(bal-data.start).toFixed(2)}</td>
+      <td style="color:var(--amber)">${((bal-data.start)/data.start*100).toFixed(1)}%</td>
+      <td style="color:var(--text2)">${(bal/data.start).toFixed(3)}×</td>
+    </tr>`;
+  }
+  tbl.innerHTML = rows + "</tbody>";
+}
+</script>
+</body>
+</html>
